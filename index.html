@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+</head>
+
+<body>
+
+    <!-- autoplay字段很重要，你可以不加这个字段试试，你会发现这个video图像是不会动的，因为它只是一帧 -->
+    <video id="local" autoplay width="640" height="480" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
+    <br>
+    <video id="remote" autoplay width="640" height="480" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
+    <button onclick="stopRecording()" style="width: 100px; height: 50px;">保存</button>
+
+
+    <script type="text/javascript">
+    var RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
+    var RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+    var URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
+    var getUserMedia = function(constraints) {
+            var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+            if (navigator.mediaDevices) {
+                return navigator.mediaDevices.getUserMedia(constraints)
+            }
+
+            if (!gum) {
+                return Promise.reject(new Error('getUserMedia is not implemented in this browser'));
+            }
+
+            return new Promise(function(resolve, reject) {
+                gum.call(navigator, constraints, resolve, reject);
+            });
+        };
+
+
+    var localVideo = document.getElementById('local');
+    var remoteVideo = document.getElementById('remote');
+
+    var constraints = { audio: false, video: true };
+    getUserMedia(constraints)
+        .then(function(stream) {
+
+            //alert(stream.getVideoTracks()[0].label);
+            playVideo(localVideo, stream);
+
+        }, function(error){
+            alert(error);
+        });
+
+    function playVideo(video, stream) {
+        var srcObject = 'srcObject' in video ? "srcObject" :
+                        'mozSrcObject' in video ? "mozSrcObject" :
+                        'webkitSrcObject' in video ? "webkitSrcObject" : "";
+        if (srcObject) {
+            video[srcObject] = stream;
+        } else {
+            video.src = URL && URL.createObjectURL(stream) || stream;
+        }
+
+        autoPlay(video);
+    }
+    function autoPlay(video) {
+        video.onloadedmetadata = function(e) {
+            //video.load();
+            video.play();
+        };
+    }
+    function startRecording(stream) {
+    }
+    function stopRecording() {
+    }
+
+    new Peer();
+    function Peer() {
+        this.pc = new RTCPeerConnection();
+
+        this.pc.onaddstream = function(obj) {
+            playVideo(remoteVideo, obj.stream);
+        }
+    }
+    Peer.prototype.offer = function () {
+        this.pc.createOffer()
+            .then(function(offer) {
+                return pc.setLocalDescription(new RTCSessionDescription(offer))
+            })
+            .then(function () {
+                return offer;
+            })
+    };
+
+
+    //pc.addStream(stream);
+    
+
+    /*pc.setRemoteDescription(new RTCSessionDescription(offer))
+     .then(function() {
+     // 根据从远端发来的offer生成一个answer(应答)
+     return pc.createAnswer();
+     })
+     .then(function(answer) {
+     return pc.setLocalDescription(new RTCSessionDescription(answer))
+     })
+     .then(function() {
+     // 发送到服务器
+     });*/
+
+    </script>
+</body>
+
+</html>
