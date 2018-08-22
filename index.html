@@ -13,7 +13,7 @@
     <video id="remote" autoplay width="640" height="480" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
     <button onclick="stopRecording()" style="width: 100px; height: 50px;">保存</button>
 
-
+    <script src="./socket.io-client.js"></script>
     <script type="text/javascript">
     var RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
     var RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
@@ -72,7 +72,12 @@
     function stopRecording() {
     }
 
-    new Peer();
+    var socket = io('https://sandbox.simplewebrtc.com:443/');
+    socket.on('connect',function() {
+        console.log('connect!');
+    });
+
+
     function Peer() {
         this.pc = new RTCPeerConnection();
 
@@ -81,14 +86,50 @@
         }
     }
     Peer.prototype.offer = function () {
-        this.pc.createOffer()
+        var pc = this.pc;
+        return pc.createOffer()
             .then(function(offer) {
+                pc.offer = offer;
                 return pc.setLocalDescription(new RTCSessionDescription(offer))
             })
-            .then(function () {
-                return offer;
+            .then(function() {
+                return pc.offer;
             })
     };
+    Peer.prototype.answer = function (offer) {
+        var pc = this.pc;
+        return pc.setRemoteDescription(new RTCSessionDescription(offer))
+            .then(function() {
+                return pc.createAnswer();
+            })
+            .then(function(answer) {
+                pc.answer = answer;
+                return pc.setLocalDescription(new RTCSessionDescription(answer))
+            })
+            .then(function() {
+                return pc.answer;
+            });
+    };
+    Peer.prototype.receiveAnswer = function (answer) {
+        return this.pc.setRemoteDescription(new RTCSessionDescription(answer))
+    };
+
+    var peer = new Peer();
+    peer.offer()
+        .then(function (offer) {
+            socket.emit('offer', offer);
+        });
+    socket.on('offer', function (offer) {
+        peer.answer(offer)
+        .then(function (answer) {
+            socket.emit('answer', answer);
+        });
+    });
+    socket.on('answer', function (answer) {
+        peer.receiveAnswer(answer)
+    });
+
+    receiveAnswer
 
 
     //pc.addStream(stream);
