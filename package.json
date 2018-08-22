@@ -1,0 +1,19 @@
+{
+  "name": "peer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "socket.io-client.js",
+  "scripts": {
+    "dev": "node server/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@120.78.214.86:10022/chenqijie/peer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "ip": "^1.1.5",
+    "socket.io": "^2.1.1"
+  }
+}

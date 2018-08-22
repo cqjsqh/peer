@@ -8,18 +8,24 @@
 <body>
 
     <!-- autoplay字段很重要，你可以不加这个字段试试，你会发现这个video图像是不会动的，因为它只是一帧 -->
-    <video id="local" autoplay width="640" height="480" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
+    <video id="local" autoplay width="320" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
     <br>
-    <video id="remote" autoplay width="640" height="480" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
-    <button onclick="stopRecording()" style="width: 100px; height: 50px;">保存</button>
+    <video id="remote" autoplay width="320" webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow"></video>
+    <button onclick="sendRtc()" style="width: 100px; height: 50px;">发起视频</button>
+    <button onclick="saveVideo()" style="width: 100px; height: 50px;">保存视频</button>
 
     <script src="./socket.io-client.js"></script>
     <script type="text/javascript">
     var RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection || window.mozRTCPeerConnection;
     var RTCSessionDescription = window.RTCSessionDescription || window.webkitRTCSessionDescription || window.mozRTCSessionDescription;
+    var RTCIceCandidate = window.RTCIceCandidate || window.webkitRTCIceCandidate || window.mozRTCIceCandidate;
     var URL = window.URL || window.webkitURL || window.mozURL || window.msURL;
     var getUserMedia = function(constraints) {
             var gum = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                //return Promise.reject(new Error('getUserMedia must be run from a secure origin: HTTPS or localhost'));
+            }
 
             if (navigator.mediaDevices) {
                 return navigator.mediaDevices.getUserMedia(constraints)
@@ -38,11 +44,20 @@
     var localVideo = document.getElementById('local');
     var remoteVideo = document.getElementById('remote');
 
-    var constraints = { audio: false, video: true };
+    var constraints = {
+        audio: true,
+        video: {
+            width: { min: 640, ideal: 640, max: 640 },
+            height: { min: 640, ideal: 640, max: 640 }
+        }
+    };
     getUserMedia(constraints)
         .then(function(stream) {
 
-            //alert(stream.getVideoTracks()[0].label);
+            console.log('摄像头：' + stream.getVideoTracks()[0].label);
+            console.log('音响：' + stream.getAudioTracks()[0].label);
+
+            peer.addStream(stream);
             playVideo(localVideo, stream);
 
         }, function(error){
@@ -63,28 +78,29 @@
     }
     function autoPlay(video) {
         video.onloadedmetadata = function(e) {
-            //video.load();
             video.play();
         };
     }
-    function startRecording(stream) {
-    }
-    function stopRecording() {
-    }
 
-    var socket = io('https://sandbox.simplewebrtc.com:443/');
-    socket.on('connect',function() {
-        console.log('connect!');
-    });
+    var socket = io('https://192.168.199.223:8443');
 
 
     function Peer() {
         this.pc = new RTCPeerConnection();
 
-        this.pc.onaddstream = function(obj) {
-            playVideo(remoteVideo, obj.stream);
+        this.pc.onaddstream = function(event) {
+            playVideo(remoteVideo, event.stream);
         }
+        this.pc.onicecandidate= function (event) {
+            if (event.candidate) {
+                socket.emit('ice', event.candidate);
+            }
+        };
     }
+    Peer.prototype.addStream = function (stream) {
+        this.stream = stream;
+        return this.pc.addStream(stream)
+    };
     Peer.prototype.offer = function () {
         var pc = this.pc;
         return pc.createOffer()
@@ -108,45 +124,74 @@
             })
             .then(function() {
                 return pc.answer;
-            });
+            })
     };
     Peer.prototype.receiveAnswer = function (answer) {
         return this.pc.setRemoteDescription(new RTCSessionDescription(answer))
     };
+    Peer.prototype.ice = function (candidate) {
+        return this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+    };
 
     var peer = new Peer();
-    peer.offer()
-        .then(function (offer) {
-            socket.emit('offer', offer);
-        });
+    socket.on('connect',function() {
+        console.log('socket connect');
+    });
     socket.on('offer', function (offer) {
         peer.answer(offer)
-        .then(function (answer) {
-            socket.emit('answer', answer);
-        });
+            .then(function (answer) {
+                socket.emit('answer', answer);
+            });
     });
     socket.on('answer', function (answer) {
         peer.receiveAnswer(answer)
+            .then(function () {
+                console.log('peer connect');
+            })
+    });
+    socket.on('ice', function (candidate) {
+        peer.ice(candidate);
     });
 
-    receiveAnswer
+    function sendRtc() {
+        peer.offer()
+            .then(function (offer) {
+                socket.emit('offer', offer);
+            });
+    }
 
+    var mimeType =  'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType =  'video/webm;codecs=vp8';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType =  'video/webm';
+        }
+    }
+    function saveVideo() {
+        var options = {
+            mimeType: mimeType, // 音视频的编码格式
+            audioBitsPerSecond: 128000, //音频码率
+            videoBitsPerSecond: 128000 //视频码率
+        };
 
-    //pc.addStream(stream);
-    
+        var mediaRecorder = new MediaRecorder(peer.stream, options);
+        //1000毫秒上传一次数据，过小（如10ms）会导致接收端浏览器处理失败
+        mediaRecorder.start(1000);
 
-    /*pc.setRemoteDescription(new RTCSessionDescription(offer))
-     .then(function() {
-     // 根据从远端发来的offer生成一个answer(应答)
-     return pc.createAnswer();
-     })
-     .then(function(answer) {
-     return pc.setLocalDescription(new RTCSessionDescription(answer))
-     })
-     .then(function() {
-     // 发送到服务器
-     });*/
+        mediaRecorder.ondataavailable = function(event) {
+            var blob = event.data;
+            if (blob && blob.size > 0) {
+                console.log('正在发送数据...');
 
+                //通过WebSocket发送到后台
+                socket.emit('chunk', blob);
+            }
+        }
+        setTimeout(function () {
+            mediaRecorder.stop();
+            socket.emit('save');
+        }, 1000 * 20)
+    }
     </script>
 </body>
 
