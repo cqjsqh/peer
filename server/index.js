@@ -36,7 +36,8 @@ io.on('connection', function (socket) {
         chunks.push(buffer);
     });
     socket.on('save', () => {
-        fs.writeFile('video.mp4', Buffer.concat(chunks))
+        // fluent-ffmpeg 视频格式转换
+        fs.writeFile('video.mp4', Buffer.concat(chunks));
         chunks = [];
     });
 });

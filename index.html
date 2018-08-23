@@ -79,13 +79,15 @@
         };
     }
 
-    var socket = io('https://192.168.199.223:8443');
+    var socket = io(':8443');
 
 
     function Peer() {
+        var that = this;
         this.pc = new RTCPeerConnection();
 
         this.pc.onaddstream = function(event) {
+            that.remoteStream = event.stream;
             playVideo(remoteVideo, event.stream);
         }
         this.pc.onicecandidate= function (event) {
@@ -176,7 +178,7 @@
             videoBitsPerSecond: 128000 //视频码率
         };
 
-        var mediaRecorder = new MediaRecorder(peer.stream, options);
+        var mediaRecorder = new MediaRecorder(peer.remoteStream, options);
         //1000毫秒上传一次数据，过小（如10ms）会导致接收端浏览器处理失败
         mediaRecorder.start(1000);
 
