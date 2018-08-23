@@ -37,49 +37,7 @@ io.on('connection', function (socket) {
     });
     socket.on('save', () => {
         // fluent-ffmpeg 视频格式转换
-        fs.writeFile('video.mp4', Buffer.concat(chunks));
+        fs.writeFile('dist/video.mp4', Buffer.concat(chunks));
         chunks = [];
     });
 });
-
-function BufferHelper() {
-    this.buffers = [];
-    this.size = 0;
-    this.status = "changed";
-};
-
-BufferHelper.prototype.concat = function (buffer) {
-    this.buffers.push(buffer);
-    this.size += buffer.length;
-    return this;
-};
-
-BufferHelper.prototype.toBuffer = function () {
-    var data = null;
-    var buffers = this.buffers, len = buffers.length;
-
-    if (this.status === "computed") {
-        return this.buffer;
-    }
-
-    switch(len) {
-        case 0:
-            data = new Buffer(0);
-            break;
-        case 1:
-            data = buffers[0];
-            break;
-        default:
-            data = new Buffer(this.size);
-            for (var i = 0, pos = 0; i < len; i++) {
-                var buffer = buffers[i];
-                buffer.copy(data, pos);
-                pos += buffer.length;
-            }
-            break;
-    }
-
-    this.status = "computed";
-    this.buffer = data;
-    return data;
-};
