@@ -166,6 +166,8 @@
             mimeType =  'video/webm';
         }
     }
+
+    var chunks = [];
     function saveVideo() {
         var MediaRecorder = window.MediaRecorder;
         if (!MediaRecorder) {
@@ -174,26 +176,31 @@
 
         var options = {
             mimeType: mimeType, // 音视频的编码格式
-            audioBitsPerSecond: 128000, //音频码率
-            videoBitsPerSecond: 128000 //视频码率
         };
 
         var mediaRecorder = new MediaRecorder(peer.remoteStream, options);
         //1000毫秒上传一次数据，过小（如10ms）会导致接收端浏览器处理失败
-        mediaRecorder.start(1000);
+        mediaRecorder.start();
 
         mediaRecorder.ondataavailable = function (event) {
             var blob = event.data;
             if (blob && blob.size > 0) {
-                console.log('正在发送数据...');
-
+                chunks.push(blob);
+                console.log(chunks)
+                //console.log('正在发送数据...');
                 //通过WebSocket发送到后台
-                socket.emit('chunk', blob);
+                //socket.emit('chunk', blob);
             }
         }
         setTimeout(function () {
             mediaRecorder.stop();
-            socket.emit('save');
+
+            setTimeout(function () {
+                var blob = new Blob(chunks, {type: 'video/mp4'});
+                console.log(1, blob)
+                socket.emit('save', { type: 'mp4', file: blob });
+                chunks = [];
+            }, 1000)
         }, 1000 * 20)
     }
     </script>
