@@ -31,12 +31,13 @@ io.on('connection', function (socket) {
         socket.broadcast.emit('ice', packet)
     });
 
-    var bufferHelper = new BufferHelper();
+    var chunks = [];
     socket.on('chunk', (buffer) => {
-        bufferHelper.concat(buffer);
+        chunks.push(buffer);
     });
     socket.on('save', () => {
-        fs.writeFile('video.mp4', bufferHelper.toBuffer())
+        fs.writeFile('video.mp4', Buffer.concat(chunks))
+        chunks = [];
     });
 });
 
